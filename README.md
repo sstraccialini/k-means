@@ -1,16 +1,29 @@
+## Index
+
+0. [Index](#index)
+1. [Standard Lloyd's Algorithm](#standard-lloyds-algorithm)
+    1. [Pseudocode](#pseudocode)
+    2. [Notes](#notes)
+2. [Accuracy](#accuracy)
+3. [Hartigan's Algorithm](#hartigans-algorithm)
+    1. [Pseudocode](#pseudocode-1)
+    2. [Notes](#notes-1)
+
+
 ## Standard Lloyd's Algorithm
 
 ### Pseudocode
 
 ```
 choose k = number of centroids
+initialize centroids randomly
 
 assign points to each centroid randomly
-move the centroid to the mean of points associated to it
+move the centroid to the mean of points assigned to it
 
 repeat:
     reassign each datapoint to the closest centroid
-    move the centroid to the mean of points associated to it
+    move the centroid to the mean of points assigned to it
 until convergence
 ```
 
@@ -21,8 +34,9 @@ until convergence
 
 ### Notes
 - how to randomly choose init centroids: ok uniformly on data?
-- is it useful kmeans++ for initialization?
-- there will never be a centroid with no points associated (?)
+- kmeans++ for initialization?
+- there will never be a centroid with no points assigned(?)
+- May handle arrays. May be optimized using arrays.
 
 ## Accuracy
 
@@ -37,3 +51,28 @@ where, in the case where the matrix $X$ is square, each row is assigned to exact
 The problem is solved applying the Hungarian algorithm.
 
 ([source](https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.linear_sum_assignment.html))
+
+## Standard Hartigan's Algorithm
+
+### Pseudocode
+```
+choose k = number of centroids
+
+assign points to each centroid randomly
+move the centroid to the mean of points assigned to it
+
+repeat:
+    for each datapoint d
+        for each centroid c
+            assign d to c
+            compute the sum of squared distances from each point to c
+        end for
+        
+        assign d to the centroid with smallest distance
+        move the centroid to the mean of points assigned to it
+    end for
+until convergence
+```
+
+
+### Notes
