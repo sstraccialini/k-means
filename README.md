@@ -8,6 +8,7 @@
 3. [Hartigan's Algorithm](#hartigans-algorithm)
     1. [Pseudocode](#pseudocode-1)
     2. [Notes](#notes-1)
+4. [Useful Resources](#useful-resources)
 
 
 ## Standard Lloyd's Algorithm
@@ -37,6 +38,7 @@ until convergence
 - kmeans++ for initialization?
 - there will never be a centroid with no points assigned(?)
 - May handle arrays. May be optimized using arrays.
+- Default tolerance $10^{-6}$?
 
 ## Accuracy
 
@@ -76,3 +78,17 @@ until convergence
 
 
 ### Notes
+
+- "One way of obtaining the initial cluster centres is suggested here. The points are
+first ordered by their distances to the overall mean of the sample. Then, for cluster
+L (L = 1,2, ..., K), the {1 + (L -1) * [M/K]}th point is chosen to be its initial cluster centre.
+In effect, some K sample points are chosen as the initial cluster centres. Using this initialization
+process, it is guaranteed that no cluster will be empty after the initial assignment in the
+subroutine. A quick initialization, which is dependent on the input order of the points, takes
+the first K points as the initial cent" (Hartigan, Wong)
+
+## Useful resources
+
+- [Hartigan’s K-Means Versus Lloyd’s K-Means – Is It Time for a Change?; Slonim, Aharoni, Crammer](https://www.ijcai.org/Proceedings/13/Papers/249.pdf)
+- [Algorithm AS 136: A K-Means Clustering Algorithm; Hartigan, Wong
+](https://doi.org/10.2307/2346830)
