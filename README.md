@@ -139,7 +139,8 @@ subroutine. A quick initialization, which is dependent on the input order of the
 the first K points as the initial cent" (Hartigan, Wong)
 - accept in order until the first that involves already modified clusters or accept until we made k/2 moves?
 - why if unsafe mode fails revert all changes? can we sort and revert change by change?
-- is safe mode always enabled standard Hartigan's?
+- is safe mode always enabled to get standard Hartigan's?
+- unsafe_mode is enabled again on every iteration of the loop?
 
 ## Useful resources
 
