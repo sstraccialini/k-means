@@ -138,6 +138,8 @@ process, it is guaranteed that no cluster will be empty after the initial assign
 subroutine. A quick initialization, which is dependent on the input order of the points, takes
 the first K points as the initial cent" (Hartigan, Wong)
 - accept in order until the first that involves already modified clusters or accept until we made k/2 moves?
+- why if unsafe mode fails revert all changes? can we sort and revert change by change?
+- is safe mode always enabled standard Hartigan's?
 
 ## Useful resources
 
