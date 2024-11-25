@@ -6,7 +6,9 @@
     2. [Notes](#notes)
 2. [Accuracy](#accuracy)
 3. [Hartigan's Algorithm](#hartigans-algorithm)
-    1. [Pseudocode](#pseudocode-1)
+    1. [Pseudocode (standard)](#pseudocode-standard)
+    2. [Notes on extended algorithm](#notes-on-extended-algorithm)
+    1. [Pseudocode (extended)](#pseudocode-extended)
     2. [Notes](#notes-1)
 4. [Useful Resources](#useful-resources)
 
@@ -54,9 +56,9 @@ The problem is solved applying the Hungarian algorithm.
 
 ([source](https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.linear_sum_assignment.html))
 
-## Standard Hartigan's Algorithm
+## Hartigan's Algorithm
 
-### Pseudocode
+### Pseudocode (standard)
 ```
 choose k = number of centroids
 
@@ -76,6 +78,55 @@ repeat:
 until convergence
 ```
 
+## Notes on extended algorithm
+- Let $z$ points in $\R^d$.
+
+- Let $c=\frac{1}{z}\sum_{i=1}^z$ their baricenter (centroid).
+
+- The cost of the cluster is
+$$cost = \sum_{i=1}^z||x_i-c||^2 = \sum_{i=1}^z||x_i||^2 -z||c||^2 $$
+
+- By removing the first $s$ points ($s<z$). the barycenter of the removed set is $g = \frac{1}{s}\sum_{i=1}^s x_i$ and that of the remaining ones is $c' = \frac{zc-sg}{z-s}$.
+
+- $$\Delta cost =-\left(\sum_{i=1}^s ||x_i||^2 - s||g||^2\right) - \frac{zs}{z-s}||c-g||^2$$
+
+- Reassigning $s$ points from cluster 1 to cluster 2, we have
+$$\Delta cost_{1\to2} = s\left(\frac{z_2}{z_2+s}||c_2 - g||^2 - \frac{z_1}{z_1+s}||c_1 - g||^2\right)$$
+
+- Reassigning just one single point:
+$$\Delta cost_{1\to2} = \frac{z_2}{z_2+1}||c_2 - x||^2 - \frac{z_1}{z_1+1}||c_1 - x||^2$$
+
+- $\begin{cases}\Delta cost < 0 : \text{reassignment is convenient}\\ \Delta cost > 0 : \text{reassignment is not convenient}\end{cases}$
+
+### Pseudocode (extended)
+
+```
+choose k = number of centroids
+
+assign points to each centroid randomly
+move the centroid to the mean of points assigned to it
+
+repeat:
+    for each datapoint d ∈ c
+        for each centroid c' ≠ c
+            compute Δcost(d; c → c')
+            | if result is negative, store in a candidates list
+            | if candidate is already in list keep the reassignment with minimum Δcost
+        end for
+    end for
+
+    if "unsafe mode":
+        accept all candidates
+        if overall cost did not decrease
+            revert changes and proceed in "safe mode"
+    else if "safe mode"
+        sort all candidates (minimum first)
+        accept them in order if the corresponding clusters have not been involved
+ 
+until convergence
+```
+
+
 
 ### Notes
 
@@ -86,9 +137,10 @@ In effect, some K sample points are chosen as the initial cluster centres. Using
 process, it is guaranteed that no cluster will be empty after the initial assignment in the
 subroutine. A quick initialization, which is dependent on the input order of the points, takes
 the first K points as the initial cent" (Hartigan, Wong)
+- accept in order until the first that involves already modified clusters or accept until we made k/2 moves?
 
 ## Useful resources
 
-- [Hartigan’s K-Means Versus Lloyd’s K-Means – Is It Time for a Change?; Slonim, Aharoni, Crammer](https://www.ijcai.org/Proceedings/13/Papers/249.pdf)
+- [Hartigan's K-Means Versus Lloyd's K-Means - Is It Time for a Change?; Slonim, Aharoni, Crammer](https://www.ijcai.org/Proceedings/13/Papers/249.pdf)
 - [Algorithm AS 136: A K-Means Clustering Algorithm; Hartigan, Wong
 ](https://doi.org/10.2307/2346830)
