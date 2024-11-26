@@ -141,6 +141,7 @@ the first K points as the initial cent" (Hartigan, Wong)
 - why if unsafe mode fails revert all changes? can we sort and revert change by change?
 - is safe mode always enabled to get standard Hartigan's?
 - unsafe_mode is enabled again on every iteration of the loop?
+- check random initialization for clusters
 
 ## Useful resources
 
