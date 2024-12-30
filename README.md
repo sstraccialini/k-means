@@ -10,6 +10,7 @@
     2. [Notes on extended algorithm](#notes-on-extended-algorithm)
     1. [Pseudocode (extended)](#pseudocode-extended)
     2. [Notes](#notes-1)
+5. [Initialization](#initialization)
 4. [Useful Resources](#useful-resources)
 
 
@@ -143,8 +144,21 @@ the first K points as the initial cent" (Hartigan, Wong)
 - unsafe_mode is enabled again on every iteration of the loop?
 - check random initialization for clusters
 
+## Initialization
+- random: select $k$ datapoints at random and take them as centroids
+- random-data: assign to each datapoint one of $k$ centroids and calculate centroids afterwards
+- kmeans++: first centroid is chosen randomly; the other are chosen with a certain probability among all datapoints, depending on the distance of them from the closest centroid.
+
+### Notes
+- probability of each datapoint to be a centroid is $$\frac{D(x)^2}{\sum_{x\in \mathcal X} D(x)^2}$$ where $D(x)$ is the shortest distance from a datapoint to the closest centroid.
+- centroids in kmeans++ are initialized as zero list but to avoid one of the following behaviour only the first i's elements are considered in the distance calculation:
+    - $[0., ... 0.]$ is the closest point to some datapoint, but is just a placeholder because the corresponding centroid not assigned yet
+    - $[0., ... 0.]$ is actually a centroid, but it's ignored to avoid the precedent result.
+
+
 ## Useful resources
 
 - [Hartigan's K-Means Versus Lloyd's K-Means - Is It Time for a Change?; Slonim, Aharoni, Crammer](https://www.ijcai.org/Proceedings/13/Papers/249.pdf)
 - [Algorithm AS 136: A K-Means Clustering Algorithm; Hartigan, Wong
 ](https://doi.org/10.2307/2346830)
+- [k-means++: The Advantages of Careful Seeding; Arthur, Vassilvitskii](http://ilpubs.stanford.edu:8090/778/1/2006-13.pdf)
