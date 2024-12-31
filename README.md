@@ -162,3 +162,4 @@ the first K points as the initial cent" (Hartigan, Wong)
 - [Algorithm AS 136: A K-Means Clustering Algorithm; Hartigan, Wong
 ](https://doi.org/10.2307/2346830)
 - [k-means++: The Advantages of Careful Seeding; Arthur, Vassilvitskii](http://ilpubs.stanford.edu:8090/778/1/2006-13.pdf)
+- [How much can k-means be improved by using better initialization and repeats?; Fränti, Sieranoja](https://doi.org/10.1016/j.patcog.2019.04.014)
