@@ -10,8 +10,10 @@
     2. [Notes on extended algorithm](#notes-on-extended-algorithm)
     1. [Pseudocode (extended)](#pseudocode-extended)
     2. [Notes](#notes-1)
-5. [Initialization](#initialization)
-4. [Useful Resources](#useful-resources)
+4. [Initialization](#initialization)
+    1. [Notes](#notes-2)
+5. [Useful Resources](#useful-resources)
+6. [Questions](#questions)
 
 
 ## Standard Lloyd's Algorithm
@@ -163,3 +165,8 @@ the first K points as the initial cent" (Hartigan, Wong)
 ](https://doi.org/10.2307/2346830)
 - [k-means++: The Advantages of Careful Seeding; Arthur, Vassilvitskii](http://ilpubs.stanford.edu:8090/778/1/2006-13.pdf)
 - [How much can k-means be improved by using better initialization and repeats?; Fränti, Sieranoja](https://doi.org/10.1016/j.patcog.2019.04.014)
+
+
+## Questions
+
+- can a centroid have no points assigned to it (empty cluster)? In such case, is it correct to reassign the centroid to a random point?
