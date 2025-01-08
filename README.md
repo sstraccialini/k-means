@@ -94,10 +94,10 @@ $$cost = \sum_{i=1}^z||x_i-c||^2 = \sum_{i=1}^z||x_i||^2 -z||c||^2 $$
 - $$\Delta cost =-\left(\sum_{i=1}^s ||x_i||^2 - s||g||^2\right) - \frac{zs}{z-s}||c-g||^2$$
 
 - Reassigning $s$ points from cluster 1 to cluster 2, we have
-$$\Delta cost_{1\to2} = s\left(\frac{z_2}{z_2+s}||c_2 - g||^2 - \frac{z_1}{z_1+s}||c_1 - g||^2\right)$$
+$$\Delta cost_{1\to2} = s\left(\frac{z_2}{z_2+s}||c_2 - g||^2 - \frac{z_1}{z_1-s}||c_1 - g||^2\right)$$
 
 - Reassigning just one single point:
-$$\Delta cost_{1\to2} = \frac{z_2}{z_2+1}||c_2 - x||^2 - \frac{z_1}{z_1+1}||c_1 - x||^2$$
+$$\Delta cost_{1\to2} = \frac{z_2}{z_2+1}||c_2 - x||^2 - \frac{z_1}{z_1-1}||c_1 - x||^2$$
 
 - $\begin{cases}\Delta cost < 0 : \text{reassignment is convenient}\\ \Delta cost > 0 : \text{reassignment is not convenient}\end{cases}$
 
@@ -170,3 +170,4 @@ the first K points as the initial cent" (Hartigan, Wong)
 ## Questions
 
 - can a centroid have no points assigned to it (empty cluster)? In such case, is it correct to reassign the centroid to a random point?
+- current_cost is set to 0 in Hartigan, when the riassignment would cause an infinite cost (?). Can it happen if the point is not equal to the centroid? What to do?
