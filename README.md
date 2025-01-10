@@ -173,3 +173,4 @@ the first K points as the initial cent" (Hartigan, Wong)
 - can a centroid have no points assigned to it (empty cluster)? In such case, is it correct to reassign the centroid to a random point?
 - current_cost is set to 0 in Hartigan, when the riassignment would cause an infinite cost (?). Can it happen if the point is not equal to the centroid? What to do?
 - In binary Hartigan ha senso riordinare la lista o è meglio procedere randomicamente?
+- in standard Hartigan, the algorithm continues from the edited datapoint on, instead than starting back from the first one.
