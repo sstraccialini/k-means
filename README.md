@@ -166,6 +166,7 @@ the first K points as the initial cent" (Hartigan, Wong)
 - [k-means++: The Advantages of Careful Seeding; Arthur, Vassilvitskii](http://ilpubs.stanford.edu:8090/778/1/2006-13.pdf)
 - [How much can k-means be improved by using better initialization and repeats?; Fränti, Sieranoja](https://doi.org/10.1016/j.patcog.2019.04.014)
 - https://stats.stackexchange.com/questions/317493/methods-of-initializing-k-means-clustering/317498#317498
+- [Using the Triangle Inequality to Accelerate k-Means; Elkan](https://cdn.aaai.org/ICML/2003/ICML03-022.pdf)
 
 
 ## Questions
@@ -174,3 +175,6 @@ the first K points as the initial cent" (Hartigan, Wong)
 - current_cost is set to 0 in Hartigan, when the riassignment would cause an infinite cost (?). Can it happen if the point is not equal to the centroid? What to do?
 - In binary Hartigan ha senso riordinare la lista o è meglio procedere randomicamente?
 - in standard Hartigan, the algorithm continues from the edited datapoint on, instead than starting back from the first one.
+
+
+- DATASETS https://cs.joensuu.fi/sipu/datasets/

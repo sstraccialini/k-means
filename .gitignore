@@ -1,2 +1,5 @@
 temp.ipynb
 Documents/*
+data/MINST
+data/stl10_binary
+data/stl10_binary.tar.gz
