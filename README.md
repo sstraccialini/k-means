@@ -167,7 +167,7 @@ the first K points as the initial cent" (Hartigan, Wong)
 - [How much can k-means be improved by using better initialization and repeats?; Fränti, Sieranoja](https://doi.org/10.1016/j.patcog.2019.04.014)
 - https://stats.stackexchange.com/questions/317493/methods-of-initializing-k-means-clustering/317498#317498
 - [Using the Triangle Inequality to Accelerate k-Means; Elkan](https://cdn.aaai.org/ICML/2003/ICML03-022.pdf)
-
+[Centroid index: Cluster level similarity measure](https://www.sciencedirect.com/science/article/abs/pii/S0031320314001150)
 
 ## Questions
 
@@ -176,5 +176,7 @@ the first K points as the initial cent" (Hartigan, Wong)
 - In binary Hartigan ha senso riordinare la lista o è meglio procedere randomicamente?
 - in standard Hartigan, the algorithm continues from the edited datapoint on, instead than starting back from the first one.
 
+## NOTICE:
+- binary is quite useless, since safe iterations are very few.
 
 - DATASETS https://cs.joensuu.fi/sipu/datasets/
