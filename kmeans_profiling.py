@@ -53,6 +53,8 @@ class KMeans:
         self.y_pred = None
 
         self.safe_iterations = 0
+        self.iterations = 0
+        self.norm_calculations = 0
 
 
     def fit(self, data : np.ndarray, k : int, debug : int = 0):
@@ -103,8 +105,8 @@ class KMeans:
         elif self.algorithm == 'hartigan':
             self._hartigan(debug)
         
-        print('final centroids:\n', self.centroids)
-        print('final y_pred:', self.y_pred)
+        debug and print('final centroids:\n', self.centroids)
+        debug and print('final y_pred:', self.y_pred)
 
 
     def _init_centroids(self, debug=0):
@@ -142,7 +144,7 @@ class KMeans:
                 debug and print('iteration', i)
 
                 # calculate squared distance of each point to closest centroid
-                dist = np.array([min([np.linalg.norm(c-x)**2 for c in centroids[:i]]) for x in self.data])
+                dist = np.min(np.linalg.norm(self.data[:, np.newaxis] - centroids[:i], axis=2) ** 2, axis=1)
 
                 # probabilities are given by the normalized distance squared
                 probs = dist / dist.sum()
@@ -169,7 +171,7 @@ class KMeans:
                 debug and print('iteration', i)
 
                 # calculate squared distance of each point to closest centroid
-                dist = np.array([min([np.linalg.norm(c-x)**2 for c in centroids[:i]]) for x in self.data])
+                dist = np.min(np.linalg.norm(self.data[:, np.newaxis] - centroids[:i], axis=2) ** 2, axis=1)
 
                 # choose next centroid as the point with the maximum distance to the closest centroid
                 centroids[i] = self.data[np.argmax(dist)]
@@ -189,6 +191,7 @@ class KMeans:
         while True:
             
             debug and print('New iteration')
+            self.iterations += 1
 
             # move centroids to the mean of their cluster
             new_centroids = self._move_centroids(None, debug > 1)
@@ -216,6 +219,8 @@ class KMeans:
         self.centroids = self._move_centroids(None, debug > 1)
 
         while True:
+            self.iterations += 1
+
             # start with unsafe mode    
             safe_mode = False
 
@@ -338,6 +343,8 @@ class KMeans:
 
         edit = True
         while edit:
+            self.iterations += 1
+
             edit =  False
             for datapoint_id in range(len(self.data)):
                 debug and print('\ndatapoint_id:', datapoint_id)
@@ -392,24 +399,11 @@ class KMeans:
         
         distances = cdist(self.data, self.centroids, metric='sqeuclidean')  # Squared Euclidean distance
         y_pred = np.argmin(distances, axis=1)
+        self.norm_calculations += 1
 
         debug and print('y_pred:', y_pred)
 
         return y_pred
-
-
-    def _delta_cost(self, cost, datapoint_id, centroid_id):
-        """
-        Compute the change in cost if datapoint is reassigned to centroid_id
-        """
-
-        cluster_size = np.where(self.y_pred == centroid_id)[0].shape[0]
-        prefactor = cluster_size / (cluster_size + 1)
-
-        # cost of new assignment
-        new_cost = prefactor * np.linalg.norm(self.data[datapoint_id] - self.centroids[centroid_id])**2
-
-        return new_cost - cost
 
 
     def _tot_cluster_cost(self, centroids, points_ids, debug=0):
@@ -440,28 +434,38 @@ class KMeans:
         Find candidates for reassignment of a single datapoint.
         """
 
-        # calculate cost of current assignment which remains invariant
+        # calculate sizes of clusters and cost of current assignment
+        cluster_sizes = np.bincount(self.y_pred, minlength=self.k)
+
         current_centroid_id = self.y_pred[datapoint_id]
-        cluster_size = np.where(self.y_pred == current_centroid_id)[0].shape[0]
-        prefactor = cluster_size / (cluster_size - 1) if cluster_size > 1 else 0
+        prefactor = cluster_sizes[current_centroid_id] / (cluster_sizes[current_centroid_id] - 1) if cluster_sizes[current_centroid_id] > 1 else 0
 
         current_cost = prefactor * np.linalg.norm(self.data[datapoint_id] - self.centroids[current_centroid_id])**2
+        self.norm_calculations += 1/(self.k*self.data.shape[0])
+
         debug and print('current_cost:', current_cost)
 
         # if current_cost is 0, delta_cost will always be positive
         if current_cost == 0:
             return candidates
+        
+        # Vectorized computation for all centroids except the current one
+        mask = np.arange(self.k) != current_centroid_id
+        cluster_sizes_masked = cluster_sizes[mask]
+        valid_centroid_ids = np.where(mask)[0]
 
-        # iterate only on possible new centroid assignments
-        for centroid_id in set(self.y_pred) - {current_centroid_id}:
-            delta_cost = self._delta_cost(current_cost, datapoint_id, centroid_id)
-            debug and print(f'delta_cost for datapoint {datapoint_id} from centroid {current_centroid_id} to centroid {centroid_id}:', delta_cost)
+        # Compute delta costs
+        delta_costs = (cluster_sizes_masked / (cluster_sizes_masked + 1)) * np.linalg.norm(self.data[datapoint_id] - self.centroids[valid_centroid_ids], axis=1)**2 - current_cost
+        self.norm_calculations += (len(cluster_sizes_masked)) / (self.k*self.data.shape[0])
 
-            # datapoint is a candidate if it reduces the cost
-            # if more reassignments reduce the cost, the best one is stored (the one producing the most negfative delta_cost)
-            if delta_cost < 0 and (candidates.get(datapoint_id) is None or delta_cost < candidates[datapoint_id][0]):
-                candidates[datapoint_id] = [delta_cost, current_centroid_id, centroid_id]
+        # Find the best centroid (most negative delta_cost)
+        best_idx = np.argmin(delta_costs)
+        best_delta_cost = delta_costs[best_idx]
 
+        if best_delta_cost < 0:
+            best_centroid_id = valid_centroid_ids[best_idx]
+            candidates[datapoint_id] = [best_delta_cost, current_centroid_id, best_centroid_id]
+        
         return candidates
 
 
@@ -496,9 +500,9 @@ a = np.array([[1,1],[2,1],[1,2],[2,3],[3,2],[9,9],[10,8],[10,10],[11,9]])
 
 with Profile() as profile:
 
-    for i in range(1):
+    for i in range(31,32):
         a1 = pd.read_table('data/A-Sets/a3.txt', header=None, sep='   ', engine='python').to_numpy()
-        kmeans = KMeans(algorithm='hartigan', init='random', seed=i)
+        kmeans = KMeans(algorithm='hartigan', init='maximin', seed=i)
         kmeans.fit(a1, 20, debug=0)
         with open('profiling/results.txt', 'w') as f:
             print(kmeans.centroids, file=f)
