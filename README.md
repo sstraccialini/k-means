@@ -167,7 +167,13 @@ the first K points as the initial cent" (Hartigan, Wong)
 - [How much can k-means be improved by using better initialization and repeats?; Fränti, Sieranoja](https://doi.org/10.1016/j.patcog.2019.04.014)
 - https://stats.stackexchange.com/questions/317493/methods-of-initializing-k-means-clustering/317498#317498
 - [Using the Triangle Inequality to Accelerate k-Means; Elkan](https://cdn.aaai.org/ICML/2003/ICML03-022.pdf)
-[Centroid index: Cluster level similarity measure](https://www.sciencedirect.com/science/article/abs/pii/S0031320314001150)
+- [Centroid index: Cluster level similarity measure](https://www.sciencedirect.com/science/article/abs/pii/S0031320314001150)
+- [Noisy, Greedy and Not so Greedy k-Means++](https://drops.dagstuhl.de/storage/00lipics/lipics-vol173-esa2020/LIPIcs.ESA.2020.18/LIPIcs.ESA.2020.18.pdf) - pseudocode of (greedy) k-means++
+- [Scalable K-Means++](https://arxiv.org/pdf/1203.6402) - parallel k-means++
+- https://github.com/scikit-learn/scikit-learn/discussions/24964 - mentions n_trials = 2 + log(k) in sklearn
+- [k-means++: The Advantages of Careful Seeding](https://theory.stanford.edu/~sergei/papers/kMeansPP-soda.pdf) - kmeans++ original paper
+- [Fast and Provably Good Seedings for k-Means](https://las.inf.ethz.ch/files/bachem16fast.pdf) - other init using Monte Carlo
+
 
 ## Questions
 
