@@ -49,6 +49,7 @@ class KMeans:
 
         self.data = None
         self.k = None
+        self.n_samples = None
         self.centroids = None
         self.y_pred = None
 
@@ -88,6 +89,7 @@ class KMeans:
 
         self.data = data
         self.k = k
+        self.n_samples = data.shape[0]
 
         np.random.seed(self.seed)
 
@@ -116,25 +118,34 @@ class KMeans:
         Initialize the centroids.
         """
 
+        v = 1
+
         if self.init == 'random':
 
-            # choose k random data points as initial centroids
-            idx = np.random.choice(self.data.shape[0], self.k, replace=False)
-            self.centroids = self.data[idx]
+            if v == 1:
+                # choose k random data points as initial centroids
+                idx = np.random.choice(self.n_samples, self.k, replace=False)
+                self.centroids = self.data[idx]
+                self.y_pred = self._assign_clusters(debug=debug>1)
 
-            self._distance_cache = cdist(self.data, self.centroids, metric='sqeuclidean')
-            self.y_pred = self._assign_clusters(debug=debug>1)
+            elif v == 2:
+                # choose k random data points as initial centroids
+                idx = np.random.choice(self.n_samples, self.k, replace=False)
+                self.centroids = self.data[idx]
+
+                self._distance_cache = cdist(self.data, self.centroids, metric='sqeuclidean')
+                self.y_pred = self._assign_clusters(debug=debug>1)
 
         elif self.init == 'random-data':
             return NotImplemented
             
             # V1
             # assign each data point to a random cluster
-            clusters = np.random.choice(self.k, self.data.shape[0])
+            clusters = np.random.choice(self.k, self.n_samples)
 
             # check that at least one point is assigned to each cluster
             while len(set(clusters)) < self.k:
-                clusters = np.random.choice(self.k, self.data.shape[0])
+                clusters = np.random.choice(self.k, self.n_samples)
             self.y_pred = clusters
             self.centroids = self._move_centroids(None, debug > 1)
 
@@ -162,162 +173,211 @@ class KMeans:
 
         elif self.init == 'k-means++':
             
-            # choose first centroid randomly
-            self.centroids = np.zeros((self.k, self.data.shape[1]))
-            first_idx = np.random.choice(self.data.shape[0])
-            self.centroids[0] = self.data[first_idx].copy()
+            if v == 1:
+                # choose first centroid randomly
+                centroids = np.zeros((self.k, self.data.shape[1]))
+                centroids[0] = self.data[np.random.choice(self.n_samples, 1, replace=False)[0]]
+                debug and print('centroids:\n', centroids)
 
-            debug and print('centroids:\n', self.centroids)
+                # iterate over remaining k-1 centroids
+                for i in range(1, self.k):
+                    debug and print('iteration', i)
 
-            # initialize min_distances with infinity
-            min_distances = np.full(self.data.shape[0], np.inf)
+                    # calculate squared distance of each point to closest centroid
+                    dist = np.min(np.linalg.norm(self.data[:, np.newaxis] - centroids[:i], axis=2) ** 2, axis=1)
 
-            # iterate over remaining k-1 centroids
-            for i in range(1, self.k):
-                debug and print('iteration', i)
+                    # probabilities are given by the normalized distance squared
+                    probs = dist / dist.sum()
+                    debug and print('probs:', probs)
 
-                # calculate squared distance of each point to closest centroid (only calculate for new centroids)
-                new_distances = np.sum((self.data - self.centroids[i-1])**2, axis=1)
-                np.minimum(min_distances, new_distances, out=min_distances)
+                    # choose next centroid randomly based on cumulated probabilities
+                    j = np.random.choice(len(self.data), p=probs)
 
-                # probabilities are given by the normalized distance squared
-                probs = min_distances / np.sum(min_distances)
-                debug and print('probs:', probs)
+                    centroids[i] = self.data[j]
+                    debug and print('centroids:\n', centroids)
 
-                # choose next centroid randomly based on cumulated probabilities
-                j = np.random.choice(len(self.data), p=probs)
+                self.centroids = centroids
+                self.y_pred = self._assign_clusters(debug=debug>1)
 
-                self.centroids[i] = self.data[j].copy()
+            elif v == 2:
+                # choose first centroid randomly
+                self.centroids = np.zeros((self.k, self.data.shape[1]))
+                first_idx = np.random.choice(self.n_samples)
+                self.centroids[0] = self.data[first_idx].copy()
+
                 debug and print('centroids:\n', self.centroids)
 
-            self._distance_cache = cdist(self.data, self.centroids, metric='sqeuclidean')
-            self.y_pred = np.argmin(self._distance_cache, axis=1)
+                # initialize min_distances with infinity
+                min_distances = np.full(self.n_samples, np.inf)
+
+                # iterate over remaining k-1 centroids
+                for i in range(1, self.k):
+                    debug and print('iteration', i)
+
+                    # calculate squared distance of each point to closest centroid (only calculate for new centroids)
+                    new_distances = np.sum((self.data - self.centroids[i-1])**2, axis=1)
+                    np.minimum(min_distances, new_distances, out=min_distances)
+
+                    # probabilities are given by the normalized distance squared
+                    probs = min_distances / np.sum(min_distances)
+                    debug and print('probs:', probs)
+
+                    # choose next centroid randomly based on cumulated probabilities
+                    j = np.random.choice(len(self.data), p=probs)
+
+                    self.centroids[i] = self.data[j].copy()
+                    debug and print('centroids:\n', self.centroids)
+
+                self._distance_cache = cdist(self.data, self.centroids, metric='sqeuclidean')
+                self.y_pred = np.argmin(self._distance_cache, axis=1)
 
         elif self.init == 'maximin':
 
-            # choose first centroid randomly
-            self.centroids = np.zeros((self.k, self.data.shape[1]))
-            first_idx = np.random.choice(self.data.shape[0])
-            self.centroids[0] = self.data[first_idx].copy()
-
-            # initialize min_distances with infinity
-            min_distances = np.full(self.data.shape[0], np.inf)
-
-            # iterate over remaining k-1 centroids
-            for i in range(1, self.k):
-                debug and print('iteration', i)
-
-                # calculate squared distance of each point to closest centroid (only calculate for new centroids)
-                new_distances = np.sum((self.data - self.centroids[i-1])**2, axis=1)
-                np.minimum(min_distances, new_distances, out=min_distances) 
-
-                # choose next centroid as the point with the maximum min_distance to the closest centroid
-                self.centroids[i] = self.data[np.argmax(min_distances)].copy()
-                debug and print('centroids:\n', self.centroids)
-
-            self._distance_cache = cdist(self.data, self.centroids, metric='sqeuclidean')
-            self.y_pred = np.argmin(self._distance_cache, axis=1)
-
-        elif self.init == 'greedy-k-means++':
-            
-            return NotImplemented
-            # V1
-            # TODO: this might be adapted
-            trials = 2 + int(np.log(self.k)) 
-
-            # choose first centroid randomly
-            centroids = np.zeros((self.k, self.data.shape[1]))
-            centroids[0] = self.data[np.random.choice(self.data.shape[0], 1, replace=False)[0]]
-            debug and print('centroids:\n', centroids)
-
-            # iterate over remaining k-1 centroids
-            for i in range(1, self.k):
-                debug and print('iteration', i)
-
-                # calculate squared distance of each point to closest centroid
-                dist = np.min(np.linalg.norm(self.data[:, np.newaxis] - centroids[:i], axis=2) ** 2, axis=1)
-
-                # probabilities are given by the normalized distance squared
-                probs = dist / dist.sum()
-                debug and print('probs:', probs)
-
-                # choose next centroid randomly based on cumulated probabilities
-                candidate_j = np.random.choice(len(self.data), size=trials, p=probs)
-                debug and print('candidate_j:', candidate_j)
-
-                # calculate the cost of each trial
-                costs = np.zeros(trials)
-                for t in range(trials):
-                    centroids[i] = self.data[candidate_j[t]]
-                    costs[t] = self._tot_cluster_cost(centroids, self._assign_clusters(specific_centroids=centroids), debug=debug>1)
-                debug and print('costs:', costs)
-
-                # choose the trial with the lowest cost
-                j = candidate_j[np.argmin(costs)]
-
-                centroids[i] = self.data[j]
+            if v == 1:
+                # choose first centroid randomly
+                centroids = np.zeros((self.k, self.data.shape[1]))
+                centroids[0] = self.data[np.random.choice(self.n_samples, 1, replace=False)[0]]
                 debug and print('centroids:\n', centroids)
 
-            self.centroids = centroids
-            self.y_pred = self._assign_clusters(debug=debug>1)
+                # iterate over remaining k-1 centroids
+                for i in range(1, self.k):
+                    debug and print('iteration', i)
 
-            # V2
-            # TODO: this might be adapted
-            trials = 2 + int(np.log(self.k)) 
+                    # calculate squared distance of each point to closest centroid
+                    dist = np.min(np.linalg.norm(self.data[:, np.newaxis] - centroids[:i], axis=2) ** 2, axis=1)
 
-            # choose first centroid randomly
-            self.centroids = np.zeros((self.k, self.data.shape[1]))
-            first_idx = np.random.choice(self.data.shape[0])
-            self.centroids[0] = self.data[first_idx].copy()
+                    # choose next centroid as the point with the maximum distance to the closest centroid
+                    centroids[i] = self.data[np.argmax(dist)]
+                    debug and print('centroids:\n', centroids)
 
-            # initialize min_distances with infinity
-            min_distances = np.full(self.data.shape[0], np.inf)
+                self.centroids = centroids
+                self.y_pred = self._assign_clusters(debug=debug>1)
 
-            # iterate over remaining k-1 centroids
-            for i in range(1, self.k):
-                debug and print('iteration', i)
+            elif v == 2:
+                # choose first centroid randomly
+                self.centroids = np.zeros((self.k, self.data.shape[1]))
+                first_idx = np.random.choice(self.n_samples)
+                self.centroids[0] = self.data[first_idx].copy()
 
-                # calculate squared distance of each point to closest centroid (only calculate for new centroids)
-                new_distances = np.sum((self.data - self.centroids[i-1])**2, axis=1)
-                np.minimum(min_distances, new_distances, out=min_distances)
+                # initialize min_distances with infinity
+                min_distances = np.full(self.n_samples, np.inf)
 
-                # probabilities are given by the normalized distance squared
-                probs = min_distances / np.sum(min_distances)
-                debug and print('probs:', probs)
+                # iterate over remaining k-1 centroids
+                for i in range(1, self.k):
+                    debug and print('iteration', i)
 
-                # choose next centroid randomly based on cumulated probabilities
-                candidate_j = np.random.choice(len(self.data), size=trials, p=probs)
-                debug and print('candidate_j:', candidate_j)
+                    # calculate squared distance of each point to closest centroid (only calculate for new centroids)
+                    new_distances = np.sum((self.data - self.centroids[i-1])**2, axis=1)
+                    np.minimum(min_distances, new_distances, out=min_distances) 
 
-                # calculate the cost of each trial
-                best_cost = np.inf
-                best_idx = -1
+                    # choose next centroid as the point with the maximum min_distance to the closest centroid
+                    self.centroids[i] = self.data[np.argmax(min_distances)].copy()
+                    debug and print('centroids:\n', self.centroids)
 
-                # costs = np.zeros(trials)
-                for t in range(trials):
-                    temp_centroids = self.centroids[:i].copy()
-                    temp_centroids = np.vstack([temp_centroids, self.data[t]])
+                self._distance_cache = cdist(self.data, self.centroids, metric='sqeuclidean')
+                self.y_pred = np.argmin(self._distance_cache, axis=1)
 
-                    distances = cdist(self.data, temp_centroids, metric='sqeuclidean')
-                    assignments = np.argmin(distances, axis=1)
+        elif self.init == 'greedy-k-means++':
 
-                    # calculate cost
-                    cost = 0
-                    for j in range(i+1):
-                        mask = assignments == j
-                        if np.any(mask):
-                            cost += np.sum(distances[mask, j])
+            if v == 1:
+                # TODO: this might be adapted
+                trials = 2 + int(np.log(self.k)) 
 
-                    if cost < best_cost:
-                        best_cost = cost
-                        best_idx = t
-                
-                self.centroids[i] = self.data[best_idx].copy()
+                # choose first centroid randomly
+                centroids = np.zeros((self.k, self.data.shape[1]))
+                f = np.random.choice(self.n_samples)
+                centroids[0] = self.data[f]
+                debug and print('centroids:\n', centroids)
 
-                debug and print('centroids:\n', self.centroids)
+                # iterate over remaining k-1 centroids
+                for i in range(1, self.k):
+                    debug and print('iteration', i)
 
-            self._distance_cache = cdist(self.data, self.centroids, metric='sqeuclidean')
-            self.y_pred = np.argmin(self._distance_cache, axis=1)
+                    # calculate squared distance of each point to closest centroid
+                    dist = np.min(np.linalg.norm(self.data[:, np.newaxis] - centroids[:i], axis=2) ** 2, axis=1)
+
+                    # probabilities are given by the normalized distance squared
+                    probs = dist / dist.sum()
+                    debug and print('probs:', probs)
+
+                    # choose next centroid randomly based on cumulated probabilities
+                    candidate_j = np.random.choice(len(self.data), size=trials, p=probs)
+                    debug and print('candidate_j:', candidate_j)
+
+                    # calculate the cost of each trial
+                    costs = np.zeros(trials)
+                    for t in range(trials):
+                        centroids[i] = self.data[candidate_j[t]]
+                        costs[t] = self._tot_cluster_cost(centroids, self._assign_clusters(specific_centroids=centroids), debug=debug>1)
+                    debug and print('costs:', costs)
+
+                    # choose the trial with the lowest cost
+                    j = candidate_j[np.argmin(costs)]
+
+                    centroids[i] = self.data[j]
+                    debug and print('centroids:\n', centroids)
+
+                self.centroids = centroids
+                self.y_pred = self._assign_clusters(debug=debug>1)
+
+            elif v == 2:
+                # V2
+                # TODO: this might be adapted
+                trials = 2 + int(np.log(self.k)) 
+
+                # choose first centroid randomly
+                self.centroids = np.zeros((self.k, self.data.shape[1]))
+                first_idx = np.random.choice(self.n_samples)
+                self.centroids[0] = self.data[first_idx].copy()
+
+                # initialize min_distances with infinity
+                min_distances = np.full(self.n_samples, np.inf)
+
+                # iterate over remaining k-1 centroids
+                for i in range(1, self.k):
+                    debug and print('iteration', i)
+
+                    # calculate squared distance of each point to closest centroid (only calculate for new centroids)
+                    new_distances = np.sum((self.data - self.centroids[i-1])**2, axis=1)
+                    np.minimum(min_distances, new_distances, out=min_distances)
+
+                    # probabilities are given by the normalized distance squared
+                    probs = min_distances / np.sum(min_distances)
+                    debug and print('probs:', probs)
+
+                    # choose next centroid randomly based on cumulated probabilities
+                    candidate_j = np.random.choice(len(self.data), size=trials, p=probs)
+                    debug and print('candidate_j:', candidate_j)
+
+                    # calculate the cost of each trial
+                    best_cost = np.inf
+                    best_idx = -1
+
+                    # costs = np.zeros(trials)
+                    for t in range(trials):
+                        temp_centroids = self.centroids[:i].copy()
+                        temp_centroids = np.vstack([temp_centroids, self.data[t]])
+
+                        distances = cdist(self.data, temp_centroids, metric='sqeuclidean')
+                        assignments = np.argmin(distances, axis=1)
+
+                        # calculate cost
+                        cost = 0
+                        for j in range(i+1):
+                            mask = assignments == j
+                            if np.any(mask):
+                                cost += np.sum(distances[mask, j])
+
+                        if cost < best_cost:
+                            best_cost = cost
+                            best_idx = t
+                    
+                    self.centroids[i] = self.data[best_idx].copy()
+
+                    debug and print('centroids:\n', self.centroids)
+
+                self._distance_cache = cdist(self.data, self.centroids, metric='sqeuclidean')
+                self.y_pred = np.argmin(self._distance_cache, axis=1)
 
 
     def _lloyd(self, debug=0):
@@ -326,25 +386,25 @@ class KMeans:
         """
 
         debug and print('\nRunning Lloyd\'s algorithm...')
+        old_y_pred = np.zeros(self.n_samples, dtype=int)
 
         while True:
             
             debug and print('New iteration')
             self.iterations += 1
+            np.copyto(old_y_pred, self.y_pred)
 
             # move centroids to the mean of their cluster
             new_centroids = self._move_centroids(None, debug > 1)
             self.centroids = new_centroids
 
             # assign each data point to the closest centroid
-            old_y_pred = self.y_pred
             self.y_pred = self._assign_clusters(debug=debug>1)
             debug and print('y_pred:', self.y_pred)
 
             # check for convergence
             if np.array_equal(old_y_pred, self.y_pred):
                 break
-
 
 
     def _extended_hartigan(self, always_safe=False, binary_hartigan=False, debug=0):
@@ -354,7 +414,7 @@ class KMeans:
 
         debug and print('\nRunning Extended Hartigan algorithm...')
 
-        # TODO: correct?
+        # move centroids to the mean of their cluster
         self.centroids = self._move_centroids(None, debug > 1)
 
         while True:
@@ -366,7 +426,7 @@ class KMeans:
             # create an empty dictionary of new candidates
             candidates = {}
 
-            for datapoint_id in range(len(self.data)):
+            for datapoint_id in range(self.n_samples):
                 debug and print('\ndatapoint_id:', datapoint_id)
 
                 candidates = self._find_candidates(datapoint_id, candidates, debug)
@@ -515,16 +575,16 @@ class KMeans:
         
         for centroid_id in move:
             
-            cluster_points = self.data[self.y_pred == centroid_id]
+            mask = self.y_pred == centroid_id
             
             # if centroid has no points assigned to it, reassign it randomly
-            if len(cluster_points) == 0: # TODO: makes sense?
+            if np.any(mask):
+                centroids[centroid_id] = np.mean(self.data[mask], axis=0)
+            else:
                 debug and print(f"  Centroid {centroid_id} is empty. Reassigning.")
                 new_centroid_id = np.random.choice(len(self.data))
                 centroids[centroid_id] = self.data[new_centroid_id]
                 self.y_pred[new_centroid_id] = centroid_id
-            else:
-                centroids[centroid_id] = np.mean(cluster_points, axis=0)
 
         debug and print('  centroids_after:\n', centroids)
 
@@ -548,10 +608,10 @@ class KMeans:
         
         if specific_centroids is None:
             specific_centroids = self.centroids
-
-        distances = cdist(self.data, specific_centroids, metric='sqeuclidean')  # Squared Euclidean distance
-        y_pred = np.argmin(distances, axis=1)
-        self.norm_calculations += specific_centroids.shape[0] / (self.k*self.data.shape[0])
+        
+        self._distance_cache = cdist(self.data, self.centroids, metric='sqeuclidean')
+        y_pred = np.argmin(self._distance_cache, axis=1)
+        self.norm_calculations += specific_centroids.shape[0] / (self.k*self.n_samples)
 
         debug and print('y_pred:', y_pred)
 
@@ -584,7 +644,7 @@ class KMeans:
             ## TODO: CHECK IMPORTANT FIX! ##
             # partial_sum1.append(np.sum(np.square(self.data[cluster_items] - self.centroids[centroid_id])))
             partial_sum.append(np.sum(np.square(self.data[cluster_items] - centroids[centroid_id])))
-            self.norm_calculations += len(cluster_items) / (self.k*self.data.shape[0])
+            self.norm_calculations += len(cluster_items) / (self.k*self.n_samples)
 
             debug and print('  | centroid_id:', centroid_id)
             debug and print('  | centroid:', centroids[centroid_id])
@@ -605,10 +665,15 @@ class KMeans:
         cluster_sizes = np.bincount(self.y_pred, minlength=self.k)
 
         current_centroid_id = self.y_pred[datapoint_id]
-        prefactor = cluster_sizes[current_centroid_id] / (cluster_sizes[current_centroid_id] - 1) if cluster_sizes[current_centroid_id] > 1 else 0
-
-        current_cost = prefactor * np.linalg.norm(self.data[datapoint_id] - self.centroids[current_centroid_id])**2
-        self.norm_calculations += 1/(self.k*self.data.shape[0])
+        current_size = cluster_sizes[current_centroid_id]
+        
+        # if current clsuter has only one point, we cannot move it
+        if current_size <= 1:
+            return candidates
+        
+        prefactor = current_size / (current_size - 1)
+        current_cost = prefactor * np.sum((self.data[datapoint_id] - self.centroids[current_centroid_id])**2)
+        self.norm_calculations += 1/(self.k*self.n_samples)
 
         debug and print('current_cost:', current_cost)
 
@@ -623,7 +688,7 @@ class KMeans:
 
         # Compute delta costs
         delta_costs = (cluster_sizes_masked / (cluster_sizes_masked + 1)) * np.linalg.norm(self.data[datapoint_id] - self.centroids[valid_centroid_ids], axis=1)**2 - current_cost
-        self.norm_calculations += (len(cluster_sizes_masked)) / (self.k*self.data.shape[0])
+        self.norm_calculations += (len(cluster_sizes_masked)) / (self.k*self.n_samples)
 
         # Find the best centroid (most negative delta_cost)
         best_idx = np.argmin(delta_costs)
@@ -668,12 +733,12 @@ with Profile() as profile:
 
     for i in range(0,10):
         a1 = pd.read_table('data/A-Sets/a3.txt', header=None, sep='   ', engine='python').to_numpy()
-        kmeans = KMeans(algorithm='lloyd', init='greedy-k-means++', seed=i)
+        kmeans = KMeans(algorithm='extended-hartigan', init='maximin', seed=i)
         kmeans.fit(a1, 20, debug=0)
         with open('profiling/results.txt', 'w') as f:
             print(kmeans.centroids, file=f)
             print(kmeans.y_pred, file=f)
-        break
+
     (
         Stats(profile)
         .strip_dirs()
