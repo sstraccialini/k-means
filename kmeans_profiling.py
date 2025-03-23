@@ -191,7 +191,7 @@ class KMeans:
                     debug and print('probs:', probs)
 
                     # choose next centroid randomly based on cumulated probabilities
-                    j = np.random.choice(len(self.data), p=probs)
+                    j = np.random.choice(self.n_samples, p=probs)
 
                     centroids[i] = self.data[j]
                     debug and print('centroids:\n', centroids)
@@ -223,7 +223,7 @@ class KMeans:
                     debug and print('probs:', probs)
 
                     # choose next centroid randomly based on cumulated probabilities
-                    j = np.random.choice(len(self.data), p=probs)
+                    j = np.random.choice(self.n_samples, p=probs)
 
                     self.centroids[i] = self.data[j].copy()
                     debug and print('centroids:\n', self.centroids)
@@ -301,7 +301,7 @@ class KMeans:
                     debug and print('probs:', probs)
 
                     # choose next centroid randomly based on cumulated probabilities
-                    candidate_j = np.random.choice(len(self.data), size=trials, p=probs)
+                    candidate_j = np.random.choice(self.n_samples, size=trials, p=probs)
                     debug and print('candidate_j:', candidate_j)
 
                     # calculate the cost of each trial
@@ -346,7 +346,7 @@ class KMeans:
                     debug and print('probs:', probs)
 
                     # choose next centroid randomly based on cumulated probabilities
-                    candidate_j = np.random.choice(len(self.data), size=trials, p=probs)
+                    candidate_j = np.random.choice(self.n_samples, size=trials, p=probs)
                     debug and print('candidate_j:', candidate_j)
 
                     # calculate the cost of each trial
@@ -449,6 +449,7 @@ class KMeans:
                 original_cost = self._tot_cluster_cost(self.centroids, self.y_pred, debug > 1)
                 debug and print('original_cost:', original_cost)
 
+                # accept all candidates
                 new_cost, new_centroids = self._accept_candidates(candidates, debug > 1)
                 debug and print('new cost:', new_cost)
 
@@ -462,14 +463,17 @@ class KMeans:
                 debug and print('\nentered in SAFE mode')
                 self.safe_iterations += 1
 
+                # track unchanged clusters and sort candidates by delta cost (most negative first)
                 unchanged_clusters = list(range(self.k))
-                debug and print('\ncandidates:', sorted(candidates.items(), key=lambda e: e[1][1], reverse=True))
-                for _, [delta_cost, current_centroid_id, new_centroid_id] in sorted(candidates.items(), key=lambda e: e[1][1], reverse=True):
+                sorted_candidates = sorted(candidates.items(), key=lambda e: e[1][1], reverse=True)
+                debug and print('\nsorted_candidates:', sorted_candidates)
+
+                for datapoint_id, [delta_cost, current_centroid_id, new_centroid_id] in sorted_candidates:
 
                     # if both clusters are still unchanged, accept the candidate
                     if current_centroid_id in unchanged_clusters and new_centroid_id in unchanged_clusters:
-                        debug and print(f'candidate {_} moved from {current_centroid_id} to {new_centroid_id}')
-                        self.y_pred[_] = new_centroid_id
+                        debug and print(f'candidate {datapoint_id} moved from {current_centroid_id} to {new_centroid_id}')
+                        self.y_pred[datapoint_id] = new_centroid_id
                         unchanged_clusters.remove(current_centroid_id)
                         unchanged_clusters.remove(new_centroid_id)
 
@@ -545,7 +549,7 @@ class KMeans:
             self.iterations += 1
 
             edit =  False
-            for datapoint_id in range(len(self.data)):
+            for datapoint_id in range(self.n_samples):
                 debug and print('\ndatapoint_id:', datapoint_id)
 
                 candidate = self._find_candidates(datapoint_id, {}, debug)
@@ -582,7 +586,7 @@ class KMeans:
                 centroids[centroid_id] = np.mean(self.data[mask], axis=0)
             else:
                 debug and print(f"  Centroid {centroid_id} is empty. Reassigning.")
-                new_centroid_id = np.random.choice(len(self.data))
+                new_centroid_id = np.random.choice(self.n_samples)
                 centroids[centroid_id] = self.data[new_centroid_id]
                 self.y_pred[new_centroid_id] = centroid_id
 
@@ -637,23 +641,28 @@ class KMeans:
         
         debug and print('\n  calculating _tot_cluster_cost')
         
-        partial_sum = []
+        total_cost = 0
+
         for centroid_id in range(centroids.shape[0]):
+            mask = points_ids == centroid_id
+            points_in_cluster = self.data[mask]
+
             cluster_items = np.where(points_ids == centroid_id)[0]
-            
-            ## TODO: CHECK IMPORTANT FIX! ##
-            # partial_sum1.append(np.sum(np.square(self.data[cluster_items] - self.centroids[centroid_id])))
-            partial_sum.append(np.sum(np.square(self.data[cluster_items] - centroids[centroid_id])))
-            self.norm_calculations += len(cluster_items) / (self.k*self.n_samples)
+
+            if len(points_in_cluster) > 0:
+                # Vectorized computation
+                cost = np.sum(np.sum((points_in_cluster - centroids[centroid_id])**2, axis=1))
+                total_cost += cost
+                self.norm_calculations += len(cluster_items) / (self.k*self.n_samples)
 
             debug and print('  | centroid_id:', centroid_id)
             debug and print('  | centroid:', centroids[centroid_id])
             debug and print('  | cluster_items:', cluster_items)
-            debug and print('  | partial_sum:', partial_sum)
+            debug and print('  | cost:', cost)
         
-        debug and print('  partial_sum:', np.sum(partial_sum))
+        debug and print(f'  total_cost: {total_cost}')
         
-        return np.sum(partial_sum)
+        return total_cost
 
 
     def _find_candidates(self, datapoint_id, candidates, debug=0):
@@ -707,10 +716,10 @@ class KMeans:
         """
         # accept all candidates
         used_centroids = set()
-        for candidate in candidates.keys():
-            debug and print('candidate:', candidate)
 
-            [delta_cost, current_centroid_id, new_centroid_id] = candidates[candidate]
+        for datapoint_id, [_, current_centroid_id, new_centroid_id] in candidates.items():
+
+            debug and print('candidate:', datapoint_id)
 
             used_centroids.add(current_centroid_id)
             used_centroids.add(new_centroid_id)
@@ -718,7 +727,7 @@ class KMeans:
             debug and print('y_pred before:', self.y_pred)
 
             # update closest_points_ids assigning datapoint to new_centroid_id
-            self.y_pred[candidate] = new_centroid_id
+            self.y_pred[datapoint_id] = new_centroid_id
             debug and print('y_pred after:', self.y_pred)
 
         new_centroids = self._move_centroids(move_just=used_centroids, debug = debug)
@@ -738,7 +747,7 @@ with Profile() as profile:
         with open('profiling/results.txt', 'w') as f:
             print(kmeans.centroids, file=f)
             print(kmeans.y_pred, file=f)
-
+        break
     (
         Stats(profile)
         .strip_dirs()
