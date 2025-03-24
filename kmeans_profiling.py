@@ -52,6 +52,7 @@ class KMeans:
         self.n_samples = None
         self.centroids = None
         self.y_pred = None
+        self._cluster_sizes = None
 
         self.safe_iterations = 0
         self.iterations = 0
@@ -397,6 +398,7 @@ class KMeans:
             # move centroids to the mean of their cluster
             new_centroids = self._move_centroids(None, debug > 1)
             self.centroids = new_centroids
+            self._distance_cache = None
 
             # assign each data point to the closest centroid
             self.y_pred = self._assign_clusters(debug=debug>1)
@@ -416,6 +418,7 @@ class KMeans:
 
         # move centroids to the mean of their cluster
         self.centroids = self._move_centroids(None, debug > 1)
+        self._distance_cache = None
 
         while True:
             self.iterations += 1
@@ -534,6 +537,7 @@ class KMeans:
                         candidates_partition = [part_1, part_2]
 
             self.centroids = new_centroids
+            self._distance_cache = None
 
     def _hartigan(self, debug=0):
         """
@@ -543,6 +547,7 @@ class KMeans:
 
         # TODO: correct?
         self.centroids = self._move_centroids(None, debug > 1)
+        self._distance_cache = None
 
         edit = True
         while edit:
@@ -558,6 +563,7 @@ class KMeans:
                 if candidate:
                     new_cost, new_centroids = self._accept_candidates(candidate, debug > 1)
                     self.centroids = new_centroids
+                    self._distance_cache = None
                     edit = True
                     # the code continues with the next datapoint instead than starting from the first one again
                     # TODO: better to start from the first one again? can depend on the index of the datapoint we edit first?
@@ -576,7 +582,7 @@ class KMeans:
         
         move = move_just if move_just is not None else range(self.k)
         debug and print('  | move:', move)
-        
+
         for centroid_id in move:
             
             mask = self.y_pred == centroid_id
@@ -613,9 +619,16 @@ class KMeans:
         if specific_centroids is None:
             specific_centroids = self.centroids
         
-        self._distance_cache = cdist(self.data, self.centroids, metric='sqeuclidean')
-        y_pred = np.argmin(self._distance_cache, axis=1)
-        self.norm_calculations += specific_centroids.shape[0] / (self.k*self.n_samples)
+            # check if we can use the distance cache
+            if self._distance_cache is None:
+                self._distance_cache = cdist(self.data, self.centroids, metric='sqeuclidean')
+                self.norm_calculations += self.n_samples / (self.k*self.n_samples)
+                
+            y_pred = np.argmin(self._distance_cache, axis=1)
+
+        else:
+            y_pred = np.argmin(cdist(self.data, specific_centroids, metric='sqeuclidean'), axis=1)
+            self.norm_calculations += specific_centroids.shape[0] / (self.k*self.n_samples)
 
         debug and print('y_pred:', y_pred)
 
@@ -641,25 +654,45 @@ class KMeans:
         
         debug and print('\n  calculating _tot_cluster_cost')
         
-        total_cost = 0
-
-        for centroid_id in range(centroids.shape[0]):
-            mask = points_ids == centroid_id
-            points_in_cluster = self.data[mask]
-
-            cluster_items = np.where(points_ids == centroid_id)[0]
-
-            if len(points_in_cluster) > 0:
-                # Vectorized computation
-                cost = np.sum(np.sum((points_in_cluster - centroids[centroid_id])**2, axis=1))
-                total_cost += cost
-                self.norm_calculations += len(cluster_items) / (self.k*self.n_samples)
-
-            debug and print('  | centroid_id:', centroid_id)
-            debug and print('  | centroid:', centroids[centroid_id])
-            debug and print('  | cluster_items:', cluster_items)
-            debug and print('  | cost:', cost)
+        v = 2
         
+        if v == 1:
+            total_cost = 0
+
+            for centroid_id in range(centroids.shape[0]):
+                mask = points_ids == centroid_id
+                points_in_cluster = self.data[mask]
+
+                cluster_items = np.where(points_ids == centroid_id)[0]
+
+                if len(points_in_cluster) > 0:
+                    # Vectorized computation
+                    cost = np.sum(np.sum((points_in_cluster - centroids[centroid_id])**2, axis=1))
+                    total_cost += cost
+                    self.norm_calculations += len(cluster_items) / (self.k*self.n_samples)
+
+                debug and print('  | centroid_id:', centroid_id)
+                debug and print('  | centroid:', centroids[centroid_id])
+                debug and print('  | cluster_items:', cluster_items)
+                debug and print('  | cost:', cost)
+        
+        elif v == 2:
+            # if distance cache exists and is current, use it
+            if self._distance_cache is not None and np.array_equal(centroids, self.centroids):
+                # use the distance cache with the cluster assignments
+                total_cost = 0
+                for centroid_id in range(centroids.shape[0]):
+                    mask = points_ids == centroid_id
+                    if np.any(mask):
+                        total_cost += np.sum(self._distance_cache[mask, centroid_id])
+            else:
+                # calculate all distances at once
+                distances = cdist(self.data, centroids, metric='sqeuclidean')
+                
+                # sum distances for each point to its assigned centroid
+                total_cost = np.sum(distances[np.arange(self.n_samples), points_ids])
+                self.norm_calculations += self.n_samples / (self.k*self.n_samples)
+
         debug and print(f'  total_cost: {total_cost}')
         
         return total_cost
@@ -691,12 +724,11 @@ class KMeans:
             return candidates
         
         # Vectorized computation for all centroids except the current one
-        mask = np.arange(self.k) != current_centroid_id
-        cluster_sizes_masked = cluster_sizes[mask]
-        valid_centroid_ids = np.where(mask)[0]
+        valid_centroid_ids = np.delete(np.arange(self.k), current_centroid_id)
+        cluster_sizes_masked = cluster_sizes[valid_centroid_ids]
 
         # Compute delta costs
-        delta_costs = (cluster_sizes_masked / (cluster_sizes_masked + 1)) * np.linalg.norm(self.data[datapoint_id] - self.centroids[valid_centroid_ids], axis=1)**2 - current_cost
+        delta_costs = (cluster_sizes_masked / (cluster_sizes_masked + 1)) * np.sum((self.data[datapoint_id] - self.centroids[valid_centroid_ids]) ** 2, axis=1) - current_cost
         self.norm_calculations += (len(cluster_sizes_masked)) / (self.k*self.n_samples)
 
         # Find the best centroid (most negative delta_cost)
@@ -743,11 +775,11 @@ with Profile() as profile:
     for i in range(0,10):
         a1 = pd.read_table('data/A-Sets/a3.txt', header=None, sep='   ', engine='python').to_numpy()
         kmeans = KMeans(algorithm='extended-hartigan', init='maximin', seed=i)
-        kmeans.fit(a1, 20, debug=0)
+        kmeans.fit(a1, 20, debug=2)
         with open('profiling/results.txt', 'w') as f:
             print(kmeans.centroids, file=f)
             print(kmeans.y_pred, file=f)
-        break
+
     (
         Stats(profile)
         .strip_dirs()
