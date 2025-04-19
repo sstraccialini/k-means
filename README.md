@@ -1,3 +1,8 @@
+## Files
+
+- `kmeans.ipynb` is the actual working file
+- `acc-kmeans.ipynb` contains some tentative implementation of accelerated clustering
+
 ## Index
 
 0. [Index](#index)
