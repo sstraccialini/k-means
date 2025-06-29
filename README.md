@@ -1,112 +1,41 @@
-## Files
+# An exploration of novel heuristics for efficient and accurate $k$-means clustering
 
-- `kmeans.ipynb` is the actual working file
-- `acc-kmeans.ipynb` contains some tentative implementation of accelerated clustering
+This repository contains the code written to develop and test the algorithms described in my Bachelor's final thesis.
 
-## Index
+## Table of Contents
+- [An exploration of novel heuristics for efficient and accurate $k$-means clustering](#an-exploration-of-novel-heuristics-for-efficient-and-accurate-k-means-clustering)
+  - [Table of Contents](#table-of-contents)
+  - [Abstract](#abstract)
+  - [Repository Structure](#repository-structure)
+  - [Extended-Hartigan pseudocode](#extended-hartigan-pseudocode)
+  - [Datasets](#datasets)
+  - [References](#references)
 
-0. [Index](#index)
-1. [Standard Lloyd's Algorithm](#standard-lloyds-algorithm)
-    1. [Pseudocode](#pseudocode)
-    2. [Notes](#notes)
-2. [Accuracy](#accuracy)
-3. [Hartigan's Algorithm](#hartigans-algorithm)
-    1. [Pseudocode (standard)](#pseudocode-standard)
-    2. [Notes on extended algorithm](#notes-on-extended-algorithm)
-    1. [Pseudocode (extended)](#pseudocode-extended)
-    2. [Notes](#notes-1)
-4. [Initialization](#initialization)
-    1. [Notes](#notes-2)
-5. [Useful Resources](#useful-resources)
-6. [Questions](#questions)
+## Abstract
 
+$K$-means is one of the most widely-used algorithms to perform clustering and exploratory data analysis, since it allows identifying relevant patterns in data. Its objective is to partition a set of observations into a predetermined number of clusters, by minimizing the within-cluster sum of squares (WCSS). However, this optimization problem is NP-hard, necessitating the use of heuristic algorithms for practical applications. The most common heuristic, Lloyd's algorithm, is simple and efficient, but at the same time it is highly susceptible to converging to suboptimal local minima, with its performance being heavily dependent on the centroids' initial positions. While alternatives, such as Hartigan's algorithm, have been proven to find better (lower-cost) solutions, they are often significantly slower and more computationally intensive.
 
-## Standard Lloyd's Algorithm
+This thesis introduces and evaluates a novel heuristic, "extended-Hartigan", designed to bridge this gap by reducing the computational complexity of the standard Hartigan's method while retaining its ability to find high-quality clusterings. The proposed algorithm deviates from the standard single-point update rule. Instead, it first identifies all candidate data points whose reassignment would individually decrease the total cost, following Hartigan's procedure, and then attempts to apply this entire list of reassignments in a single "unsafe" batch update. If this aggressive update fails to lower the overall cost, the algorithm reverts the changes and proceeds in a "safe" mode, accepting a limited subset of non-conflicting reassignments to guarantee a monotonic cost reduction in that iteration.
 
-### Pseudocode
+To validate this approach, we conduct an empirical study comparing extended-Hartigan and its hybrid "mixed-mode" variants against the classical Lloyd's and Hartigan's algorithms. The evaluation spans several benchmark datasets, which feature diverse numbers of samples, dimensions, and cluster counts. The comparison is performed using multiple initialization techniques, including maximin, $k$-means++, and greedy $k$-means++, and performance is assessed based on the final cost, computational efficiency, and clustering stability. The results demonstrate that the proposed methods consistently find clusterings with a lower final cost than Lloyd's algorithm, achieving a significant cost reduction on the most complex datasets. Moreover, extended-Hartigan avoids the computational instability inherent in the standard Hartigan algorithm, showing a cost profile closer to the efficient Lloyd's baseline and successfully preventing extreme cost increases. The findings indicate that the extended-Hartigan algorithm is a robust and efficient alternative that successfully balances the trade-off between solution quality and computational expense, offering a practical and powerful alternative for $k$-means clustering.
 
-```
-choose k = number of centroids
-initialize centroids randomly
+## Repository Structure
+Here's the structure of this repository:
 
-assign points to each centroid randomly
-move the centroid to the mean of points assigned to it
+- `data`: contains some datasets on which the algorithms where tested.
+- `iter_records`: contains some records of safe and unsafe iterations using our proposed `extended-hartigan` algorithm, mainly for an illustrative scope.
+- `latex`: contains the latex-formatted tables of results which are included in the Appendix of the final work.
+- `misc`: contains a bunch of experimental code, proofs-of-concept (PoCs), and isolated tests developed during the main project's lifecycle. The code within this folder is not part of the final application, is not actively maintained, and can be safely ignored for any production build. It serves as a development 'sandbox' for trying out new ideas.
+- `profiling`: contains some profiling code to speed up the algorithms; used during development phase.
+- `tests`: contains all tests results.
+- `utils`: contains some other useful code which is not directly related with the developed algorithms (such as code for results visualization and so on...).
+- `Abstract.txt`: the abstract of the final work
+- **`kmeans.ipynb`: the actual notebook containing all algorithms developed.**
+- `Tesi-final.pdf`: the final version of my thesis work.
 
-repeat:
-    reassign each datapoint to the closest centroid
-    move the centroid to the mean of points assigned to it
-until convergence
-```
+## Extended-Hartigan pseudocode
 
-- Centroids $\mu_1,\dots,\mu_k$  are initialized uniformly at random on datapoints
-- $c_i = \arg min_j ||x_i-\mu_j||$ for every $i$.
-- $\mu_j = \frac{\sum_{i=1}^n \mathbb{1_{[c_i=j]}x_i}}{\sum_{i=1}^n \mathbb{1_{[c_i=j]}}}$
-
-
-### Notes
-- how to randomly choose init centroids: ok uniformly on data?
-- kmeans++ for initialization?
-- there will never be a centroid with no points assigned(?)
-- May handle arrays. May be optimized using arrays.
-- Default tolerance $10^{-6}$?
-
-## Accuracy
-
-To account for the fact that we can get a correct clustering permutating outputted clusters (i.e. to compare true and predicted labels without caring about the way the cluster is labelled) we solve a linear sum assignment problem.
-
-The linear sum assignment problem is also known as minimum weight matching in bipartite graphs. A problem instance is described by a matrix $C$, where each $C[i,j]$ is the cost of matching vertex $i$ of the first partite set (a ‘worker’) and vertex $j$ of the second set (a ‘job’). The goal is to find a complete assignment of workers to jobs of minimal cost.
-
-Formally, let $X$ be a boolean matrix where $X[i,j]=1$ iff row $i$ is assigned to column $j$. Then the optimal assignment has cost $$\min\sum_i\sum_j C_{i,j}X_{i,j}$$
-
-where, in the case where the matrix $X$ is square, each row is assigned to exactly one column, and each column to exactly one row.
-
-The problem is solved applying the Hungarian algorithm.
-
-([source](https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.linear_sum_assignment.html))
-
-## Hartigan's Algorithm
-
-### Pseudocode (standard)
-```
-choose k = number of centroids
-
-assign points to each centroid randomly
-move the centroid to the mean of points assigned to it
-
-repeat:
-    for each datapoint d
-        for each centroid c
-            assign d to c
-            compute the sum of squared distances from each point to c
-        end for
-        
-        assign d to the centroid with smallest distance
-        move the centroid to the mean of points assigned to it
-    end for
-until convergence
-```
-
-## Notes on extended algorithm
-- Let $z$ points in $\R^d$.
-
-- Let $c=\frac{1}{z}\sum_{i=1}^z$ their baricenter (centroid).
-
-- The cost of the cluster is
-$$cost = \sum_{i=1}^z||x_i-c||^2 = \sum_{i=1}^z||x_i||^2 -z||c||^2 $$
-
-- By removing the first $s$ points ($s<z$). the barycenter of the removed set is $g = \frac{1}{s}\sum_{i=1}^s x_i$ and that of the remaining ones is $c' = \frac{zc-sg}{z-s}$.
-
-- $$\Delta cost =-\left(\sum_{i=1}^s ||x_i||^2 - s||g||^2\right) - \frac{zs}{z-s}||c-g||^2$$
-
-- Reassigning $s$ points from cluster 1 to cluster 2, we have
-$$\Delta cost_{1\to2} = s\left(\frac{z_2}{z_2+s}||c_2 - g||^2 - \frac{z_1}{z_1-s}||c_1 - g||^2\right)$$
-
-- Reassigning just one single point:
-$$\Delta cost_{1\to2} = \frac{z_2}{z_2+1}||c_2 - x||^2 - \frac{z_1}{z_1-1}||c_1 - x||^2$$
-
-- $\begin{cases}\Delta cost < 0 : \text{reassignment is convenient}\\ \Delta cost > 0 : \text{reassignment is not convenient}\end{cases}$
-
-### Pseudocode (extended)
+One of the main contribution of this work is the algorithm we called `extended-Hartigan`. Here follows its pseudocode.
 
 ```
 choose k = number of centroids
@@ -134,60 +63,68 @@ repeat:
 until convergence
 ```
 
+## Datasets
 
+The main datasets used in this work where *A-Sets* from a research project by Karkkainen
+and Franti [KF02], Bridge and House, from a work by Franti, Rezaei, and Zhao [FRZ14]. These, and other datasets which are used for clustering tasks, are available in the following website: https://cs.joensuu.fi/sipu/datasets/.
 
-### Notes
+## References
 
-- "One way of obtaining the initial cluster centres is suggested here. The points are
-first ordered by their distances to the overall mean of the sample. Then, for cluster
-L (L = 1,2, ..., K), the {1 + (L -1) * [M/K]}th point is chosen to be its initial cluster centre.
-In effect, some K sample points are chosen as the initial cluster centres. Using this initialization
-process, it is guaranteed that no cluster will be empty after the initial assignment in the
-subroutine. A quick initialization, which is dependent on the input order of the points, takes
-the first K points as the initial cent" (Hartigan, Wong)
-- accept in order until the first that involves already modified clusters or accept until we made k/2 moves?
-- why if unsafe mode fails revert all changes? can we sort and revert change by change?
-- is safe mode always enabled to get standard Hartigan's?
-- unsafe_mode is enabled again on every iteration of the loop?
-- check random initialization for clusters
+[AV07] David Arthur and Sergei Vassilvitskii. “K-Means++: The Advantages of Careful
+Seeding”. In: vol. 8. Jan. 2007, pp. 1027–1035. doi: 10.1145/1283383.1283494.
 
-## Initialization
-- random: select $k$ datapoints at random and take them as centroids
-- random-data: assign to each datapoint one of $k$ centroids and calculate centroids afterwards
-- kmeans++: first centroid is chosen randomly; the other are chosen with a certain probability among all datapoints, depending on the distance of them from the closest centroid.
+[Bha+19] Anup Bhattacharya et al. Noisy, Greedy and Not So Greedy k-means++. Dec.
+2019. doi: 10.48550/arXiv.1912.00653. url: http://arxiv.org/abs/1912.00653.
 
-### Notes
-- probability of each datapoint to be a centroid is $$\frac{D(x)^2}{\sum_{x\in \mathcal X} D(x)^2}$$ where $D(x)$ is the shortest distance from a datapoint to the closest centroid.
-- centroids in kmeans++ are initialized as zero list but to avoid one of the following behaviour only the first i's elements are considered in the distance calculation:
-    - $[0., ... 0.]$ is the closest point to some datapoint, but is just a placeholder because the corresponding centroid not assigned yet
-    - $[0., ... 0.]$ is actually a centroid, but it's ignored to avoid the precedent result.
+[Elk03] Charles Elkan. “Using the triangle inequality to accelerate k-means”. In: Proceed-
+ings of the Twentieth International Conference on International Conference on
+Machine Learning. ICML’03. Washington, DC, USA: AAAI Press, 2003, pp. 147–
+153. isbn: 1577351894.
 
+[FRZ14] Pasi Franti, Mohammad Rezaei, and Qinpei Zhao. “Centroid index: Cluster level
+similarity measure”. en. In: Pattern Recognition 47.9 (Sept. 2014), pp. 3034–
+3045. issn: 00313203. doi: 10 . 1016 / j . patcog . 2014 . 03 . 017. url: https://linkinghub.elsevier.com/retrieve/pii/S0031320314001150.
 
-## Useful resources
+[Gru+22] Christoph Grunau et al. A Nearly Tight 0Analysis of Greedy k-means++. July
+2022. doi: 10.48550/arXiv.2207.07949. url: http://arxiv.org/abs/2207.07949.
 
-- [Hartigan's K-Means Versus Lloyd's K-Means - Is It Time for a Change?; Slonim, Aharoni, Crammer](https://www.ijcai.org/Proceedings/13/Papers/249.pdf)
-- [Algorithm AS 136: A K-Means Clustering Algorithm; Hartigan, Wong
-](https://doi.org/10.2307/2346830)
-- [k-means++: The Advantages of Careful Seeding; Arthur, Vassilvitskii](http://ilpubs.stanford.edu:8090/778/1/2006-13.pdf)
-- [How much can k-means be improved by using better initialization and repeats?; Fränti, Sieranoja](https://doi.org/10.1016/j.patcog.2019.04.014)
-- https://stats.stackexchange.com/questions/317493/methods-of-initializing-k-means-clustering/317498#317498
-- [Using the Triangle Inequality to Accelerate k-Means; Elkan](https://cdn.aaai.org/ICML/2003/ICML03-022.pdf)
-- [Centroid index: Cluster level similarity measure](https://www.sciencedirect.com/science/article/abs/pii/S0031320314001150)
-- [Noisy, Greedy and Not so Greedy k-Means++](https://drops.dagstuhl.de/storage/00lipics/lipics-vol173-esa2020/LIPIcs.ESA.2020.18/LIPIcs.ESA.2020.18.pdf) - pseudocode of (greedy) k-means++
-- [Scalable K-Means++](https://arxiv.org/pdf/1203.6402) - parallel k-means++
-- https://github.com/scikit-learn/scikit-learn/discussions/24964 - mentions n_trials = 2 + log(k) in sklearn
-- [k-means++: The Advantages of Careful Seeding](https://theory.stanford.edu/~sergei/papers/kMeansPP-soda.pdf) - kmeans++ original paper
-- [Fast and Provably Good Seedings for k-Means](https://las.inf.ethz.ch/files/bachem16fast.pdf) - other init using Monte Carlo
+[Har75] John A. Hartigan. Clustering algorithms. eng. A Wiley publication in applied
+statistics. New York: Wiley, 1975. isbn: 9780471356455.
 
+[HW79] J. A. Hartigan and M. A. Wong. “Algorithm AS 136: A K-Means Clustering Algo-
+rithm”. In: Journal of the Royal Statistical Society. Series C (Applied Statistics)
+28.1 (1979), pp. 100–108. issn: 00359254, 14679876. url: http://www.jstor.org/stable/2346830.
 
-## Questions
+[KF02] Ismo Karkkainen and Pasi Franti. Dynamic local search algorithm for the cluster-
+ing problem. eng. Report series / University of Joensuu, Department of Computer
+Science. A, 2002-6. OCLC: 58380784. Joensuu: University of Joensuu, 2002. isbn:
+9789524581431.
 
-- can a centroid have no points assigned to it (empty cluster)? In such case, is it correct to reassign the centroid to a random point?
-- current_cost is set to 0 in Hartigan, when the riassignment would cause an infinite cost (?). Can it happen if the point is not equal to the centroid? What to do?
-- In binary Hartigan ha senso riordinare la lista o è meglio procedere randomicamente?
-- in standard Hartigan, the algorithm continues from the edited datapoint on, instead than starting back from the first one.
+[Llo82] S. Lloyd. “Least squares quantization in PCM”. en. In: IEEE Transactions on
+Information Theory 28.2 (Mar. 1982), pp. 129–137. issn: 0018-9448. doi: 10.
+1109 / TIT . 1982 . 1056489. url: http://ieeexplore.ieee.org/document/1056489/.
 
-## NOTICE:
-- binary is quite useless, since safe iterations are very few.
+[NF16] James Newling and Francois Fleuret. “Fast k-means with accurate bounds”.
+en. In: Proceedings of The 33rd International Conference on Machine Learning.
+PMLR, June 2016, pp. 936–944. url: https://proceedings.mlr.press/v48/newling16.html.
 
-- DATASETS https://cs.joensuu.fi/sipu/datasets/
+[SB14] Shai Shalev-Shwartz and Shai Ben-David. Understanding machine learning: from
+theory to algorithms. eng. New York: Cambridge university press, 2014. isbn:
+9781107057135.
+
+[Sci] Scikit-learn. KMeans. en. url: https://scikit-learn/stable/modules/generated/sklearn.cluster.KMeans.html.
+
+[TV10] Matus Telgarsky and Andrea Vattani. “Hartigan’s Method: k-means Clustering
+without Voronoi”. In: Proceedings of the Thirteenth International Conference on
+Artificial Intelligence and Statistics. Ed. by Yee Whye Teh and Mike Titterington.
+Vol. 9. Proceedings of Machine Learning Research. Chia Laguna Resort, Sardinia,
+Italy: PMLR, May 2010, pp. 820–827. url: https://proceedings.mlr.press/v9/telgarsky10a.html.
+
+[Wu+08] Xindong Wu et al. “Top 10 algorithms in data mining”. en. In: Knowledge and
+Information Systems 14.1 (Jan. 2008), pp. 1–37. issn: 0219-1377, 0219-3116. doi:
+10.1007/s10115-007-0114-2. url: http://link.springer.com/10.1007/s10115-007-0114-2.
+
+[Xia+22] Shuyin Xia et al. “Ball kk-Means: Fast Adaptive Clustering With No Bounds”.
+In: IEEE Transactions on Pattern Analysis and Machine Intelligence 44.1 (Jan.
+2022), pp. 87–99. issn: 1939-3539. doi: 10.1109/TPAMI.2020.3008694. url:
+https://ieeexplore.ieee.org/document/9139397.
